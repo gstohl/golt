@@ -1,0 +1,41 @@
+[workspace]
+members = [
+    "ecs-macros",
+    "ecs-runtime",
+    "ecs-cli",
+]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+authors = ["gstohl"]
+description = "Golt - A lightweight ECS framework for Solana with code generation"
+repository = "https://github.com/gstohl/golt"
+
+[workspace.dependencies]
+# Solana/Pinocchio
+pinocchio = "0.8"
+pinocchio-pubkey = "0.2"
+pinocchio-system = "0.2"
+
+# Proc macro utilities
+syn = { version = "2.0", features = ["full", "parsing", "extra-traits"] }
+quote = "1.0"
+proc-macro2 = "1.0"
+darling = "0.20"
+
+# CLI
+clap = { version = "4.4", features = ["derive"] }
+toml = "0.8"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Code generation
+heck = "0.5"  # Case conversion (snake_case, camelCase, etc.)
+prettyplease = "0.2"  # Rust code formatting
+
+# Utilities
+thiserror = "1.0"
+anyhow = "1.0"

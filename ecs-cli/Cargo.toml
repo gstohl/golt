@@ -1,0 +1,23 @@
+[package]
+name = "golt"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "CLI for Golt ECS framework - scaffolding and code generation"
+
+[[bin]]
+name = "golt"
+path = "src/main.rs"
+
+[dependencies]
+clap.workspace = true
+toml.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+anyhow.workspace = true
+heck.workspace = true
+
+# For TypeScript generation
+quote.workspace = true
+proc-macro2.workspace = true
+syn.workspace = true
