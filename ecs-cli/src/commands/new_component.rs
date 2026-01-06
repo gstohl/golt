@@ -92,7 +92,7 @@ fn update_workspace_members(project_root: &Path, config: &GoltConfig) -> Result<
     let content = fs::read_to_string(&cargo_path)?;
 
     // Parse existing members
-    let mut lines: Vec<&str> = content.lines().collect();
+    let lines: Vec<&str> = content.lines().collect();
 
     // Find members array
     let mut in_members = false;

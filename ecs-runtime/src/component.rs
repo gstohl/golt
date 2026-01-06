@@ -36,9 +36,33 @@ pub trait Component: Sized {
 }
 
 /// Trait for components that can be delegated to Ephemeral Rollups
+///
+/// Implement this trait for components that need to be delegated to MagicBlock's
+/// Ephemeral Rollups for fast, gasless gameplay.
+///
+/// # Example
+/// ```ignore
+/// impl Delegatable for MyComponent {
+///     fn get_entity(&self) -> &Pubkey {
+///         &self.entity
+///     }
+///
+///     fn get_bump(&self) -> u8 {
+///         self.bump
+///     }
+/// }
+/// ```
 pub trait Delegatable: Component {
-    /// Check if the component is currently delegated
-    fn is_delegated(&self) -> bool;
+    /// Get the entity this component belongs to
+    fn get_entity(&self) -> &Pubkey;
+
+    /// Get the PDA bump for this component
+    fn get_bump(&self) -> u8;
+
+    /// Build the PDA seeds for signing delegation transactions
+    fn delegation_seeds(&self) -> Vec<&[u8]> {
+        vec![Self::SEED, self.get_entity().as_ref()]
+    }
 }
 
 /// Helper to calculate struct size at compile time

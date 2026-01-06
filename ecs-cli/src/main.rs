@@ -6,6 +6,8 @@
 //! - `golt new system <name>` - Create a new system
 //! - `golt generate ts` - Generate TypeScript bindings
 //! - `golt build` - Build all programs
+//! - `golt test` - Run tests for all programs
+//! - `golt deploy <name>` - Deploy a program to Solana
 
 use clap::{Parser, Subcommand};
 use anyhow::Result;
@@ -13,6 +15,7 @@ use anyhow::Result;
 mod commands;
 mod config;
 mod generators;
+mod parser;
 mod templates;
 
 #[derive(Parser)]
@@ -54,6 +57,24 @@ enum Commands {
 
     /// List all components and systems
     List,
+
+    /// Run tests for all programs
+    Test {
+        /// Specific component or system name to test
+        name: Option<String>,
+    },
+
+    /// Deploy a program to Solana
+    Deploy {
+        /// Program name (component or system)
+        name: String,
+        /// RPC URL (default: localhost)
+        #[arg(long, default_value = "localhost")]
+        url: String,
+        /// Payer keypair path
+        #[arg(long)]
+        keypair: Option<String>,
+    },
 }
 
 #[derive(Subcommand)]
@@ -107,5 +128,9 @@ fn main() -> Result<()> {
         },
         Commands::Build { sbf } => commands::build::run(sbf),
         Commands::List => commands::list::run(),
+        Commands::Test { name } => commands::test::run(name.as_deref()),
+        Commands::Deploy { name, url, keypair } => {
+            commands::deploy::run(&name, &url, keypair.as_deref())
+        }
     }
 }

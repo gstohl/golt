@@ -9,6 +9,7 @@ description = "Runtime library for Golt ECS framework"
 pinocchio.workspace = true
 pinocchio-pubkey.workspace = true
 pinocchio-system.workspace = true
+ephemeral-rollups-pinocchio.workspace = true
 thiserror.workspace = true
 
 [lib]

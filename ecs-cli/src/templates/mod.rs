@@ -13,6 +13,7 @@ license.workspace = true
 pinocchio.workspace = true
 pinocchio-pubkey.workspace = true
 pinocchio-system.workspace = true
+ephemeral-rollups-pinocchio.workspace = true
 ecs-core = {{ path = "../../core" }}
 
 [lib]
@@ -130,6 +131,11 @@ pub fn component_instruction_rs(pascal_name: &str) -> String {
 
 use pinocchio::program_error::ProgramError;
 
+/// Instruction discriminator for delegate (used by templates)
+pub const DELEGATE_DISCRIMINATOR: u8 = 253;
+/// Instruction discriminator for undelegate callback
+pub const UNDELEGATE_CALLBACK_DISCRIMINATOR: u8 = 0xc4;
+
 #[derive(Clone, Copy, Debug)]
 pub enum {pascal_name}Instruction {{
     /// Initialize a new {pascal_name} component
@@ -142,6 +148,29 @@ pub enum {pascal_name}Instruction {{
     Init,
 
     // TODO: Add more instructions here
+
+    /// Delegate component to Ephemeral Rollup
+    ///
+    /// Accounts:
+    /// 0. `[signer, writable]` Payer
+    /// 1. `[writable]` {pascal_name} PDA
+    /// 2. `[writable]` Buffer PDA
+    /// 3. `[writable]` Delegation Record PDA
+    /// 4. `[writable]` Delegation Metadata PDA
+    /// 5. `[]` Owner Program (this program)
+    /// 6. `[]` System Program
+    /// 7. `[]` Delegation Program
+    Delegate {{
+        commit_frequency_ms: u32,
+        validator: [u8; 32],
+    }},
+
+    /// Undelegate callback (called by delegation program)
+    ///
+    /// Accounts:
+    /// 0. `[writable]` {pascal_name} PDA
+    /// 1. `[]` Buffer PDA
+    Undelegate,
 }}
 
 impl {pascal_name}Instruction {{
@@ -153,6 +182,26 @@ impl {pascal_name}Instruction {{
         match tag {{
             0 => Ok(Self::Init),
             // TODO: Add more cases
+
+            // Delegate instruction
+            DELEGATE_DISCRIMINATOR => {{
+                if rest.len() < 36 {{
+                    return Err(ProgramError::InvalidInstructionData);
+                }}
+                let commit_frequency_ms = u32::from_le_bytes(rest[0..4].try_into().unwrap());
+                let validator: [u8; 32] = rest[4..36].try_into().unwrap();
+                Ok(Self::Delegate {{
+                    commit_frequency_ms,
+                    validator,
+                }})
+            }}
+
+            // Undelegate instruction (explicit call)
+            254 => Ok(Self::Undelegate),
+
+            // Undelegate callback from delegation program
+            UNDELEGATE_CALLBACK_DISCRIMINATOR if data.len() >= 8 => Ok(Self::Undelegate),
+
             _ => Err(ProgramError::InvalidInstructionData),
         }}
     }}
@@ -161,6 +210,17 @@ impl {pascal_name}Instruction {{
         match self {{
             Self::Init => vec![0],
             // TODO: Add more cases
+            Self::Delegate {{
+                commit_frequency_ms,
+                validator,
+            }} => {{
+                let mut data = vec![0u8; 37];
+                data[0] = DELEGATE_DISCRIMINATOR;
+                data[1..5].copy_from_slice(&commit_frequency_ms.to_le_bytes());
+                data[5..37].copy_from_slice(validator);
+                data
+            }}
+            Self::Undelegate => vec![254],
         }}
     }}
 }}
@@ -177,6 +237,7 @@ pub fn component_processor_rs(snake_name: &str, pascal_name: &str) -> String {
         r#"//! {pascal_name} processor
 
 use ecs_core::{{require_keys_eq, require_signer, require_writable, EcsError}};
+use ephemeral_rollups_pinocchio::{{instruction::delegate_account, types::DelegateConfig}};
 use pinocchio::{{
     account_info::AccountInfo,
     instruction::{{Seed, Signer}},
@@ -202,6 +263,11 @@ pub fn process_instruction(
     match instruction {{
         {pascal_name}Instruction::Init => process_init(program_id, accounts),
         // TODO: Add more cases
+        {pascal_name}Instruction::Delegate {{
+            commit_frequency_ms,
+            validator,
+        }} => process_delegate(program_id, accounts, commit_frequency_ms, validator),
+        {pascal_name}Instruction::Undelegate => process_undelegate(accounts),
     }}
 }}
 
@@ -243,6 +309,84 @@ fn process_init(program_id: &Pubkey, accounts: &[AccountInfo]) -> ProgramResult 
     let mut data = component_account.try_borrow_mut_data()?;
     let component = {pascal_name}::new(*entity.key(), bump);
     component.pack(&mut data);
+
+    Ok(())
+}}
+
+/// Delegate component to Ephemeral Rollup
+fn process_delegate(
+    program_id: &Pubkey,
+    accounts: &[AccountInfo],
+    commit_frequency_ms: u32,
+    validator: [u8; 32],
+) -> ProgramResult {{
+    let mut iter = accounts.iter();
+    let payer = iter.next().ok_or(ProgramError::NotEnoughAccountKeys)?;
+    let component_account = iter.next().ok_or(ProgramError::NotEnoughAccountKeys)?;
+    let buffer = iter.next().ok_or(ProgramError::NotEnoughAccountKeys)?;
+    let delegation_record = iter.next().ok_or(ProgramError::NotEnoughAccountKeys)?;
+    let delegation_metadata = iter.next().ok_or(ProgramError::NotEnoughAccountKeys)?;
+    let owner_program = iter.next().ok_or(ProgramError::NotEnoughAccountKeys)?;
+    let _system_program = iter.next().ok_or(ProgramError::NotEnoughAccountKeys)?;
+    let _delegation_program = iter.next().ok_or(ProgramError::NotEnoughAccountKeys)?;
+
+    require_signer!(payer);
+    require_writable!(component_account, EcsError::AccountNotWritable);
+
+    // Verify owner program matches this program
+    require_keys_eq!(*owner_program.key(), *program_id, EcsError::InvalidProgramId);
+
+    // Verify account is owned by this program
+    if unsafe {{ component_account.owner() }} != program_id {{
+        return Err(ProgramError::IllegalOwner);
+    }}
+
+    // Get component data to extract entity and bump
+    let data = component_account.try_borrow_data()?;
+    let component = {pascal_name}::unpack(&data).ok_or(EcsError::NotInitialized)?;
+    let bump = component.bump;
+    let entity_key = component.entity;
+    drop(data);
+
+    // Build seeds for PDA signing
+    let seeds: &[&[u8]] = &[ecs_core::seeds::{upper_name}, entity_key.as_ref()];
+
+    // Configure delegation
+    let validator_pubkey = Pubkey::from(validator);
+    let config = DelegateConfig {{
+        commit_frequency_ms,
+        validator: Some(validator_pubkey),
+    }};
+
+    // Delegate to ephemeral rollup
+    delegate_account(
+        &[
+            payer,
+            component_account,
+            owner_program,
+            buffer,
+            delegation_record,
+            delegation_metadata,
+        ],
+        seeds,
+        bump,
+        config,
+    )?;
+
+    Ok(())
+}}
+
+/// Handle undelegate callback from delegation program
+fn process_undelegate(accounts: &[AccountInfo]) -> ProgramResult {{
+    let mut iter = accounts.iter();
+    let component_account = iter.next().ok_or(ProgramError::NotEnoughAccountKeys)?;
+    let _buffer = iter.next().ok_or(ProgramError::NotEnoughAccountKeys)?;
+
+    require_writable!(component_account, EcsError::AccountNotWritable);
+
+    // The delegation program has already restored the account data from the buffer.
+    // This callback is for any post-undelegation cleanup if needed.
+    // Most components don't need to do anything here.
 
     Ok(())
 }}
