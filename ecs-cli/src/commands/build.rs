@@ -10,15 +10,20 @@ pub fn run(sbf: bool) -> Result<()> {
 
     println!("Building Golt project: {}", config.project.name);
 
-    let build_cmd = if sbf { "build-sbf" } else { "build" };
+    let status = if sbf {
+        // Use cargo-build-sbf directly for reliable SBF builds
+        println!("Running cargo-build-sbf...");
+        Command::new("cargo-build-sbf")
+            .current_dir(&project_root)
+            .status()?
+    } else {
+        Command::new("cargo")
+            .arg("build")
+            .current_dir(&project_root)
+            .status()?
+    };
 
-    // Build from project root
-    let output = Command::new("cargo")
-        .arg(build_cmd)
-        .current_dir(&project_root)
-        .status()?;
-
-    if !output.success() {
+    if !status.success() {
         anyhow::bail!("Build failed");
     }
 

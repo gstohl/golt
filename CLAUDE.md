@@ -47,6 +47,8 @@ golt new system <name>                    # Create new system
 golt generate ts [--output <dir>]         # Generate TypeScript bindings
 golt generate keypair <name>              # Generate program keypair
 golt build [--sbf true]                   # Build all programs (SBF target by default)
+golt test [name]                          # Run tests (optionally for specific program)
+golt deploy <name> [--url] [--keypair]    # Deploy program to Solana
 golt list                                 # List components and systems
 ```
 
@@ -120,7 +122,13 @@ program_id = "..."
 ## Development Notes
 
 - This is v0.1.0 - the framework is new and evolving
-- TypeScript generation is stubbed but not yet implemented
+- TypeScript generation parses Rust source files to generate accurate bindings
 - Instruction encoding doesn't support nested structs
 - Testing relies on mollusk-svm for integration tests
-- The `Delegatable` trait exists for future ephemeral rollup support
+- Full MagicBlock Ephemeral Rollups delegation support via `Delegatable` trait
+
+## Known Issues
+
+| Issue | Workaround |
+|-------|------------|
+| Pinocchio CPI requires matching account arrays | Don't include program in account_infos |
