@@ -297,12 +297,55 @@ golt/
 │   └── src/
 │       ├── component.rs  # Component trait
 │       ├── delegation.rs # ER delegation helpers
-│       ├── entity.rs     # Entity registry
+│       ├── entity.rs     # Entity helpers
 │       ├── account.rs    # Account utilities
 │       ├── error.rs      # Error types & macros
 │       └── pda.rs        # PDA derivation
+├── ecs-registry/      # Entity Registry program (optional)
+│   └── src/
+│       ├── state.rs      # Entity state (id, owner, active)
+│       ├── instruction.rs # Create, Transfer, Deactivate
+│       ├── processor.rs  # Instruction handlers
+│       └── error.rs      # Registry errors
 └── examples/          # Example projects
 ```
+
+## Entity Registry (Optional)
+
+The Entity Registry is an optional Solana program that provides centralized entity management. It must be deployed before your game programs if you want to use it.
+
+### Deploying the Registry
+
+```bash
+# Build the registry
+cargo build-sbf -p golt-registry
+
+# Generate keypair
+solana-keygen new -o registry-keypair.json
+
+# Deploy
+solana program deploy target/deploy/golt_registry.so --program-id registry-keypair.json --url localhost
+```
+
+### Registry Instructions
+
+| Instruction | Accounts | Description |
+|-------------|----------|-------------|
+| `Create(entity_id: u64)` | payer, entity_pda, system_program | Create entity, payer becomes owner |
+| `Transfer` | owner, entity_pda, new_owner | Transfer ownership |
+| `Deactivate` | owner, entity_pda | Mark entity inactive |
+
+### Entity PDA
+
+Entities are stored in PDAs derived as:
+```
+PDA = ["entity", entity_id (u64 le bytes)]
+```
+
+### When to Use
+
+- **With Registry**: Centralized entity ownership, transferable entities, entity deactivation
+- **Without Registry**: Entities are just keypairs, components attach directly via their own PDAs
 
 ## Dependencies
 
