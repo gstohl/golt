@@ -13,6 +13,7 @@ golt/
 ├── ecs-cli/          # CLI tool (golt binary) for project scaffolding and management
 ├── ecs-macros/       # Procedural macros (#[derive(Component)], #[derive(System)])
 ├── ecs-runtime/      # Runtime library with traits, error handling, and account utilities
+├── ecs-registry/     # Entity Registry program for centralized entity management
 └── examples/         # Example projects (currently empty)
 ```
 

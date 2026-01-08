@@ -2,6 +2,7 @@
 members = [
     "ecs-macros",
     "ecs-runtime",
+    "ecs-registry",
     "ecs-cli",
 ]
 resolver = "2"

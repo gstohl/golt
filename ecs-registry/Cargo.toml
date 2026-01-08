@@ -1,0 +1,19 @@
+[package]
+name = "golt-registry"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Entity Registry program for Golt ECS framework"
+
+[dependencies]
+pinocchio.workspace = true
+pinocchio-pubkey.workspace = true
+pinocchio-system.workspace = true
+golt-runtime = { path = "../ecs-runtime" }
+
+[lib]
+crate-type = ["cdylib", "lib"]
+
+[features]
+default = []
+no-entrypoint = []
