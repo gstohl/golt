@@ -1,7 +1,7 @@
 //! Build all programs
 
 use anyhow::Result;
-use std::process::Command;
+use std::process::{Command, Stdio};
 
 use crate::config::GoltConfig;
 
@@ -11,15 +11,25 @@ pub fn run(sbf: bool) -> Result<()> {
     println!("Building Golt project: {}", config.project.name);
 
     let status = if sbf {
-        // Use cargo-build-sbf directly for reliable SBF builds
-        println!("Running cargo-build-sbf...");
-        Command::new("cargo-build-sbf")
+        println!("Running cargo build-sbf...");
+        println!();
+
+        // Run through shell to ensure proper environment setup
+        Command::new("sh")
+            .arg("-c")
+            .arg("cargo build-sbf")
             .current_dir(&project_root)
+            .stdin(Stdio::inherit())
+            .stdout(Stdio::inherit())
+            .stderr(Stdio::inherit())
             .status()?
     } else {
         Command::new("cargo")
             .arg("build")
             .current_dir(&project_root)
+            .stdin(Stdio::inherit())
+            .stdout(Stdio::inherit())
+            .stderr(Stdio::inherit())
             .status()?
     };
 
